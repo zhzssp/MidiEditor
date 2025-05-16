@@ -93,6 +93,8 @@ document.getElementById("playBtn").addEventListener("click", async () => {
     Tone.Transport.bpm.value = 120;
     Tone.Transport.start();
 
+    updateProgressLoop(); // 启动进度线刷新
+
     currentMidi.tracks.forEach((track, trackIndex) => {
         if (!trackVisibility[trackIndex]) return;
         track.notes.forEach(note => {
@@ -101,14 +103,13 @@ document.getElementById("playBtn").addEventListener("click", async () => {
             }, note.time);
         });
     });
-
-    // ✅ 启动进度更新循环
-    requestAnimationFrame(updateProgress);
 });
 
 document.getElementById("pauseBtn").addEventListener("click", () => {
     Tone.Transport.pause();
     isPlaying = false;
+
+    cancelAnimationFrame(animationFrameId);
 });
 
 document.getElementById("resetBtn").addEventListener("click", () => {
@@ -117,7 +118,14 @@ document.getElementById("resetBtn").addEventListener("click", () => {
 
     currentTime = 0; // 重置时间
     progressLineX = 0; // 重置进度线位置
-    drawProgressLine(); // 重绘进度线
+
+    cancelAnimationFrame(animationFrameId);
+
+    // 擦除进度线
+    ctx.clearRect(progressLineX, 0, progressLineWidth + 1, canvas.height);
+
+    // 重绘音符和网格
+    drawPianoRoll(currentMidi);
 });
 
 document.getElementById("exportBtn").addEventListener("click", () => {
@@ -162,9 +170,6 @@ function drawPianoRoll(midi) {
             ctx.fillRect(x, y, width, height);
         });
     });
-
-    // ✅ 初始化进度线（初始位于0秒位置）
-    drawProgressLine();
 }
 
 function getColor(index) {
@@ -240,43 +245,35 @@ function drawGrid() {
     }
 }
 
-// ✅ 进度更新函数（基于 Tone.js 的运输时间）
-function updateProgress() {
-    if (isPlaying) {
-        currentTime = Tone.Transport.time; // 获取当前播放时间（秒）
-        progressLineX = currentTime * timeScale; // 转换为像素坐标
-
-        // 限制进度线不超过画布宽度
-        if (progressLineX > canvas.width) {
-            progressLineX = canvas.width;
-            isPlaying = false; // 播放结束时停止
-            Tone.Transport.stop();
-        }
-
-        drawProgressLine(); // 绘制进度线
-    }
-    requestAnimationFrame(updateProgress); // 循环更新
-}
-
-// ✅ 绘制进度线及时间显示
 function drawProgressLine() {
-    ctx.save(); // 保存绘图状态
+    // 擦除上一帧的进度线
+    ctx.clearRect(lastProgressLineX, 0, progressLineWidth + 1, canvas.height);
 
-    // 1. 绘制垂直黑线
-    ctx.lineWidth = progressLineWidth;
-    ctx.strokeStyle = '#ff0000'; // 红色进度线
+    // 当前播放时间
+    currentTime = Tone.Transport.seconds;
+    progressLineX = currentTime * timeScale;
+
+    // 绘制新的进度线
     ctx.beginPath();
     ctx.moveTo(progressLineX, 0);
     ctx.lineTo(progressLineX, canvas.height);
+    ctx.strokeStyle = "red";
+    ctx.lineWidth = progressLineWidth;
     ctx.stroke();
 
-    // 2. 绘制时间显示（格式：0.00 秒）
-    ctx.fillStyle = '#ff0000';
-    ctx.font = '12px Arial';
-    const timeText = currentTime.toFixed(2) + 's'; // 保留两位小数
-    const textX = progressLineX + timeDisplayOffset; // 时间数字位于线右侧
-    const textY = 15; // 顶部偏移量
-    ctx.fillText(timeText, textX, textY);
+    // 显示时间数字
+    ctx.fillStyle = "black";
+    ctx.font = "12px Arial";
+    ctx.fillText(currentTime.toFixed(2) + "s", progressLineX + 4, timeDisplayOffset);
 
-    ctx.restore(); // 恢复绘图状态
+    // 记录本次绘制位置用于下一帧擦除
+    lastProgressLineX = progressLineX;
+}
+
+let animationFrameId;
+
+function updateProgressLoop() {
+    if (!isPlaying) return;
+    drawProgressLine();
+    animationFrameId = requestAnimationFrame(updateProgressLoop);
 }
