@@ -6,7 +6,7 @@ let trackVisibility = []; // 全局轨道可见性控制数组
 
 const canvas = document.getElementById("pianoRoll");
 const ctx = canvas.getContext("2d");
-const noteHeight = 8;
+const noteHeight = 18;
 const timeScale = 150;
 const pitchBase = 21; // A0
 const visibleRange = 88;
@@ -121,6 +121,9 @@ function drawPianoRoll(midi) {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // ✅ 绘制网格在底层
+    drawGrid();
+
     midi.tracks.forEach((track, trackIndex) => {
         if (!trackVisibility[trackIndex]) return;
         track.notes.forEach(note => {
@@ -139,37 +142,53 @@ function getColor(index) {
     return colors[index % colors.length];
 }
 
-// // 新增：绘制网格和参考线
-// function drawGrid() {
-//     // 绘制垂直时间线
-//     ctx.strokeStyle = '#eee';
-//     ctx.lineWidth = 1;
+function getNoteName(midi) {
+    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const octave = Math.floor(midi / 12) - 1;
+    const note = noteNames[midi % 12];
+    return `${note}${octave}`;
+}
 
-//     const measureWidth = timeScale * 4; // 每4拍一个小节
-//     for (let x = 0; x < canvas.width; x += measureWidth) {
-//         ctx.beginPath();
-//         ctx.moveTo(x, 0);
-//         ctx.lineTo(x, canvas.height);
-//         ctx.stroke();
+function drawGrid() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height); // 可选，确保清屏后重绘
 
-//         // 标记小节位置
-//         ctx.fillStyle = '#666';
-//         ctx.font = '10px Arial';
-//         ctx.fillText(`${Math.floor(x / measureWidth) + 1}`, x + 5, 15);
-//     }
+    // 垂直时间线
+    const measureWidth = timeScale * 4;
+    ctx.lineWidth = 1;
 
-//     // 绘制水平音高线
-//     for (let i = 0; i <= visibleRange; i += 12) {
-//         const y = canvas.height - (i * noteHeight);
-//         ctx.beginPath();
-//         ctx.moveTo(0, y);
-//         ctx.lineTo(canvas.width, y);
-//         ctx.stroke();
+    // 遍历所有音高线
+    for (let i = 0; i < visibleRange; i++) {
+        const y = canvas.height - (i * noteHeight);
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.strokeStyle = i % 12 === 0 ? '#bbb' : '#eee';
+        ctx.stroke();
+    }
 
-//         // 标记音高
-//         const pitch = pitchBase + i;
-//         const noteName = new Midi().noteName(pitch);
-//         ctx.fillText(noteName, 5, y - 3);
-//     }
-// }
+    // 遍历所有时间线
+    for (let x = 0; x < canvas.width; x += measureWidth) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.strokeStyle = '#ddd';
+        ctx.stroke();
+
+        // 标记小节
+        ctx.fillStyle = '#888';
+        ctx.font = '10px Arial';
+        ctx.fillText(`M${Math.floor(x / measureWidth) + 1}`, x + 3, 10);
+
+        // 在每个交点处标记音高
+        for (let i = 0; i < visibleRange; i++) {
+            const y = canvas.height - (i * noteHeight);
+            const midiNum = pitchBase + i;
+            const noteName = getNoteName(midiNum);
+
+            ctx.fillStyle = '#444';
+            ctx.font = '9px Arial';
+            ctx.fillText(noteName, x + 2, y - 2);
+        }
+    }
+}
 
